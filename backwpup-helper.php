@@ -5,7 +5,7 @@
  * Description: Developer/testing utilities to simplify BackWPup testing and development.
  *              Adds a discreet admin-topbar entry to manage BackWPup backup folders
  *              and toggle the "Big backup" state so tests and local workflows are easier.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Sandy Figueroa
  * Author URI: https://github.com/sandyfzu
  * Text Domain: backwpup-helper
@@ -23,7 +23,7 @@ define( 'BWH_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BWH_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 // Plugin version (bump on releases)
 if ( ! defined( 'BWH_VERSION' ) ) {
-	define( 'BWH_VERSION', '1.0.0' );
+	define( 'BWH_VERSION', '1.0.1' );
 }
 
 // Autoload or include main class
