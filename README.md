@@ -33,7 +33,6 @@ Installation
 wp plugin activate backwpup-helper
 ```
 
-
 Usage
 
 - Use the admin bar entry while logged in as a user with `manage_options` to access quick test actions.
@@ -70,7 +69,6 @@ $ wp bwh backups clear
 Success: Removed: /path/to/wp-content/uploads/backwpup
 Success: Removed: /path/to/wp-content/uploads/backwpup-restore
 ```
-
 
 Testing
 
