@@ -1,0 +1,29 @@
+/* Styles for BackWPup Helper admin bar items */
+.bwh-state{
+    display: inline-block;
+    font-size: 11px;
+    line-height: 1;
+    padding: 2px 6px;
+    margin-left: 6px;
+    border-radius: 3px;
+    color: #fff;
+}
+.bwh-active{
+    background-color: #28a745; /* green */
+}
+.bwh-inactive{
+    background-color: #dc3545; /* red */
+}
+
+/* transient message */
+.bwh-msg{
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    z-index: 99999;
+    font-size: 13px;
+}
