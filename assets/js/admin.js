@@ -41,16 +41,54 @@
         // Confirmation modal for clear action
         function createConfirmModal(){
             if (document.getElementById('bwh-confirm-modal')) return;
+
+            // overlay
+            var overlay = document.createElement('div');
+            overlay.className = 'bwh-modal-overlay';
+
+            // modal container
             var modal = document.createElement('div');
             modal.id = 'bwh-confirm-modal';
-            modal.innerHTML = '\n+                <div class="bwh-modal-overlay"></div>\n+                <div class="bwh-modal">\n+                    <div class="bwh-modal-body">\n+                        <p>Are you sure you want to permanently remove BackWPup backup folders from uploads?</p>\n+                        <div class="bwh-modal-actions">\n+                            <button class="bwh-btn bwh-confirm">Remove</button>\n+                            <button class="bwh-btn bwh-cancel">Cancel</button>\n+                        </div>\n+                    </div>\n+                </div>';
+            modal.className = 'bwh-modal-container';
+            modal.style.display = 'none';
+
+            var box = document.createElement('div');
+            box.className = 'bwh-modal';
+
+            var body = document.createElement('div');
+            body.className = 'bwh-modal-body';
+
+            var p = document.createElement('p');
+            p.textContent = 'Are you sure you want to permanently remove BackWPup backup folders from uploads?';
+
+            var actions = document.createElement('div');
+            actions.className = 'bwh-modal-actions';
+
+            var btnConfirm = document.createElement('button');
+            btnConfirm.className = 'bwh-btn bwh-confirm';
+            btnConfirm.textContent = 'Remove';
+
+            var btnCancel = document.createElement('button');
+            btnCancel.className = 'bwh-btn bwh-cancel';
+            btnCancel.textContent = 'Cancel';
+
+            actions.appendChild(btnCancel);
+            actions.appendChild(btnConfirm);
+            body.appendChild(p);
+            body.appendChild(actions);
+            box.appendChild(body);
+            modal.appendChild(overlay);
+            modal.appendChild(box);
             document.body.appendChild(modal);
 
             // handlers
-            modal.querySelector('.bwh-cancel').addEventListener('click', function(){
+            btnCancel.addEventListener('click', function(){
                 modal.style.display = 'none';
             });
-            modal.querySelector('.bwh-confirm').addEventListener('click', function(){
+            overlay.addEventListener('click', function(){
+                modal.style.display = 'none';
+            });
+            btnConfirm.addEventListener('click', function(){
                 modal.style.display = 'none';
                 // perform AJAX clear
                 var form = new FormData();

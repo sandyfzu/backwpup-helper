@@ -17,6 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'BWH_PLUGIN_FILE', __FILE__ );
 define( 'BWH_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BWH_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+// Plugin version (bump on releases)
+if ( ! defined( 'BWH_VERSION' ) ) {
+	define( 'BWH_VERSION', '1.0.0' );
+}
 
 // Autoload or include main class
 require_once BWH_PLUGIN_DIR . 'includes/class-backwpup-helper.php';

@@ -48,8 +48,21 @@ class BWH_Helper {
             return; // limit to site admins
         }
 
-        wp_register_script( 'bwh-admin', BWH_PLUGIN_URL . 'assets/js/admin.js', array(), '1.0.0', true );
-        wp_register_style( 'bwh-admin', BWH_PLUGIN_URL . 'assets/css/admin.css', array(), '1.0.0' );
+        $js_file = BWH_PLUGIN_DIR . 'assets/js/admin.js';
+        $css_file = BWH_PLUGIN_DIR . 'assets/css/admin.css';
+
+        // Use plugin version for cache-busting in production; during development (WP_DEBUG)
+        // prefer file modification time so changes are visible immediately.
+        if ( ( defined( 'WP_DEBUG' ) && WP_DEBUG ) || ! ( defined( 'BWH_VERSION' ) && BWH_VERSION ) ) {
+            $js_ver  = file_exists( $js_file ) ? filemtime( $js_file ) : BWH_VERSION;
+            $css_ver = file_exists( $css_file ) ? filemtime( $css_file ) : BWH_VERSION;
+        } else {
+            $js_ver  = defined( 'BWH_VERSION' ) ? BWH_VERSION : false;
+            $css_ver = defined( 'BWH_VERSION' ) ? BWH_VERSION : false;
+        }
+
+        wp_register_script( 'bwh-admin', BWH_PLUGIN_URL . 'assets/js/admin.js', array(), $js_ver, true );
+        wp_register_style( 'bwh-admin', BWH_PLUGIN_URL . 'assets/css/admin.css', array(), $css_ver );
 
         wp_enqueue_script( 'bwh-admin' );
         wp_enqueue_style( 'bwh-admin' );
@@ -82,7 +95,7 @@ class BWH_Helper {
         // Top-level item (not a button)
         $wp_admin_bar->add_node( array(
             'id'    => 'bwh_root',
-            'title' => 'BackWPup',
+            'title' => 'BackWPup Helper',
             'href'  => false,
             'meta'  => array( 'class' => 'bwh-root' ),
         ) );
