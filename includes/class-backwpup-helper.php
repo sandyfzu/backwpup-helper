@@ -11,7 +11,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class BackWPup_Helper {
+// Register WP-CLI commands if WP-CLI is available
+// Load shared service
+require_once BWH_PLUGIN_DIR . 'includes/class-backwpup-service.php';
+
+// Register WP-CLI commands if WP-CLI is available
+if ( defined( 'WP_CLI' ) || class_exists( 'WP_CLI' ) ) {
+    require_once BWH_PLUGIN_DIR . 'includes/class-backwpup-commands.php';
+}
+/**
+ * Main plugin class (prefixed to avoid conflicts with BackWPup plugin).
+ */
+class BWH_Helper {
 
     /**
      * Initialize hooks
@@ -49,7 +60,7 @@ class BackWPup_Helper {
             array(
                 'ajax_url' => admin_url( 'admin-ajax.php' ),
                 'nonce'    => wp_create_nonce( 'bwh_nonce' ),
-                'state'    => $this->is_bigbackup_active() ? 'active' : 'inactive',
+                'state'    => BWH_Service::is_bigbackup_active() ? 'active' : 'inactive',
             )
         );
     }
@@ -86,7 +97,7 @@ class BackWPup_Helper {
         ) );
 
         // Big backup state (initial text will be updated by JS for colored tag)
-        $state = $this->is_bigbackup_active() ? 'active' : 'inactive';
+        $state = BWH_Service::is_bigbackup_active() ? 'active' : 'inactive';
 
         $wp_admin_bar->add_node( array(
             'id'     => 'bwh_bigbackup',
@@ -108,21 +119,7 @@ class BackWPup_Helper {
 
         check_ajax_referer( 'bwh_nonce', 'nonce' );
 
-        $uploads = wp_get_upload_dir();
-        $base    = isset( $uploads['basedir'] ) ? $uploads['basedir'] : WP_CONTENT_DIR . '/uploads';
-
-        $targets = array( $base . '/backwpup', $base . '/backwpup-restore' );
-        $results = array();
-
-        foreach ( $targets as $dir ) {
-            if ( is_dir( $dir ) ) {
-                $ok = $this->rrmdir( $dir );
-                $results[ $dir ] = $ok ? 'removed' : 'error';
-            } else {
-                $results[ $dir ] = 'not_found';
-            }
-        }
-
+        $results = BWH_Service::clear_backups();
         wp_send_json_success( array( 'results' => $results ) );
     }
 
@@ -136,27 +133,11 @@ class BackWPup_Helper {
 
         check_ajax_referer( 'bwh_nonce', 'nonce' );
 
-        $flag = WP_CONTENT_DIR . '/bigFiles/.donotbackup';
-        $dir  = dirname( $flag );
-
-        if ( file_exists( $flag ) ) {
-            // Currently inactive -> remove file to activate
-            $ok = @unlink( $flag );
-            if ( $ok ) {
-                wp_send_json_success( array( 'state' => 'active' ) );
-            }
-            wp_send_json_error( array( 'state' => 'error' ) );
-        } else {
-            // Create directory if needed and create empty flag file to deactivate
-            if ( ! is_dir( $dir ) ) {
-                wp_mkdir_p( $dir );
-            }
-            $ok = @touch( $flag );
-            if ( $ok ) {
-                wp_send_json_success( array( 'state' => 'inactive' ) );
-            }
+        $new_state = BWH_Service::toggle_bigbackup();
+        if ( $new_state === 'error' ) {
             wp_send_json_error( array( 'state' => 'error' ) );
         }
+        wp_send_json_success( array( 'state' => $new_state ) );
     }
 
     /**
@@ -164,39 +145,6 @@ class BackWPup_Helper {
      *
      * @return bool
      */
-    public function is_bigbackup_active() {
-        $flag = WP_CONTENT_DIR . '/bigFiles/.donotbackup';
-        return ! file_exists( $flag );
-    }
-
-    /**
-     * Recursively remove a directory and its contents.
-     * Uses SPL iterators for performance and reliability.
-     *
-     * @param string $dir
-     * @return bool
-     */
-    protected function rrmdir( $dir ) {
-        if ( ! is_dir( $dir ) ) {
-            return false;
-        }
-
-        // Use RecursiveDirectoryIterator to iterate and remove files/dirs
-        try {
-            $it = new RecursiveDirectoryIterator( $dir, RecursiveDirectoryIterator::SKIP_DOTS );
-            $ri = new RecursiveIteratorIterator( $it, RecursiveIteratorIterator::CHILD_FIRST );
-            foreach ( $ri as $file ) {
-                /** @var SplFileInfo $file */
-                if ( $file->isDir() ) {
-                    @rmdir( $file->getPathname() );
-                } else {
-                    @unlink( $file->getPathname() );
-                }
-            }
-            return @rmdir( $dir );
-        } catch ( Exception $e ) {
-            return false;
-        }
-    }
+    // Service methods moved to BackWPup_Service
 
 }

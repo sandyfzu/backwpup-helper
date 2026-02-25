@@ -23,7 +23,7 @@ require_once BWH_PLUGIN_DIR . 'includes/class-backwpup-helper.php';
 
 // Initialize plugin
 function bwh_init_plugin() {
-	$plugin = new BackWPup_Helper();
+	$plugin = new BWH_Helper();
 	$plugin->init();
 }
 

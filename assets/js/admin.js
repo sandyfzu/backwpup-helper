@@ -38,10 +38,21 @@
         // Initialize state label
         setStateText(toggleAnchor, bwh_ajax.state || 'inactive');
 
-        if (clearAnchor) {
-            clearAnchor.addEventListener('click', function (e) {
-                e.preventDefault();
+        // Confirmation modal for clear action
+        function createConfirmModal(){
+            if (document.getElementById('bwh-confirm-modal')) return;
+            var modal = document.createElement('div');
+            modal.id = 'bwh-confirm-modal';
+            modal.innerHTML = '\n+                <div class="bwh-modal-overlay"></div>\n+                <div class="bwh-modal">\n+                    <div class="bwh-modal-body">\n+                        <p>Are you sure you want to permanently remove BackWPup backup folders from uploads?</p>\n+                        <div class="bwh-modal-actions">\n+                            <button class="bwh-btn bwh-confirm">Remove</button>\n+                            <button class="bwh-btn bwh-cancel">Cancel</button>\n+                        </div>\n+                    </div>\n+                </div>';
+            document.body.appendChild(modal);
 
+            // handlers
+            modal.querySelector('.bwh-cancel').addEventListener('click', function(){
+                modal.style.display = 'none';
+            });
+            modal.querySelector('.bwh-confirm').addEventListener('click', function(){
+                modal.style.display = 'none';
+                // perform AJAX clear
                 var form = new FormData();
                 form.append('action', 'bwh_clear_backups');
                 form.append('nonce', bwh_ajax.nonce);
@@ -55,6 +66,15 @@
                             showMessage('Nothing to remove or error occurred.');
                         }
                     }).catch(function () { showMessage('Request failed.'); });
+            });
+        }
+
+        if (clearAnchor) {
+            clearAnchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                createConfirmModal();
+                var modal = document.getElementById('bwh-confirm-modal');
+                if (modal) modal.style.display = 'block';
             });
         }
 

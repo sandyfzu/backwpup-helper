@@ -27,3 +27,14 @@
     z-index: 99999;
     font-size: 13px;
 }
+
+/* Modal styles */
+#bwh-confirm-modal{display:none;position:fixed;z-index:99998;left:0;top:0;right:0;bottom:0}
+.bwh-modal-overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45)}
+.bwh-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:16px;border-radius:6px;max-width:420px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3)}
+.bwh-modal-body p{margin:0 0 12px;color:#222}
+.bwh-modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.bwh-btn{padding:6px 10px;border-radius:4px;border:1px solid #ccc;background:#f7f7f7;cursor:pointer}
+.bwh-btn.bwh-confirm{background:#dc3545;color:#fff;border-color:#c0392b}
+.bwh-btn.bwh-cancel{background:#fff}
+
