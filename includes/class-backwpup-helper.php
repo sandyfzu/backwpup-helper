@@ -22,7 +22,7 @@ if ( defined( 'WP_CLI' ) || class_exists( 'WP_CLI' ) ) {
 /**
  * Main plugin class (prefixed to avoid conflicts with BackWPup plugin).
  */
-class BWH_Helper {
+class BWH_Main {
 
     /**
      * Initialize hooks
