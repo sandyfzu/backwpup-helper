@@ -1,11 +1,13 @@
 <?php
 /**
  * Plugin Name: BackWPup Helper
+ * Plugin URI: https://github.com/sandyfzu/backwpup-helper
  * Description: Developer/testing utilities to simplify BackWPup testing and development.
  *              Adds a discreet admin-topbar entry to manage BackWPup backup folders
  *              and toggle the "Big backup" state so tests and local workflows are easier.
  * Version: 1.0.0
  * Author: Sandy Figueroa
+ * Author URI: https://github.com/sandyfzu
  * Text Domain: backwpup-helper
  * Requires PHP: 7.4
  * Requires at least: 6.9
