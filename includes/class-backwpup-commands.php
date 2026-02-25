@@ -2,7 +2,10 @@
 /**
  * WP-CLI commands for BackWPup Helper
  *
- * Provides two subcommands under the `bwh` namespace:
+ * Provides developer-oriented WP-CLI helpers under the `bwh` namespace that
+ * make it easier to script and test BackWPup behaviors from the command line.
+ *
+ * Subcommands:
  *  - `bwh backups clear [--dry-run]`  : clear backup directories under uploads
  *  - `bwh bigbackup status|toggle`     : inspect and toggle the bigFiles flag
  */

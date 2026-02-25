@@ -1,6 +1,9 @@
 # BackWPup Helper
 
-Lightweight WordPress plugin that adds an admin-topbar item with a hover submenu to manage BackWPup Helper backup folders and toggle the "Big backup" flag.
+BackWPup Helper provides small, focused developer and testing utilities that make it easy
+to prepare, inspect, and manipulate BackWPup state during development and automated tests.
+It exposes a discreet admin-topbar entry and WP-CLI helpers so you can quickly clear
+local backup folders and toggle the Big backup flag without editing files by hand.
 
 Compatibility
 
@@ -9,12 +12,11 @@ Compatibility
 
 Features
 
-- Admin top bar entry `BackWPup` (visible to users with `manage_options`).
-- Submenu items:
-  - `Clear backup data` — removes `uploads/backwpup` and `uploads/backwpup-restore` recursively.
-  - `Big backup: active|inactive` — toggles the `wp-content/bigFiles/.donotbackup` flag file.
-- Confirmation modal for the clear action.
-- WP-CLI commands: `wp bwh bigbackup status`, `wp bwh bigbackup toggle`, `wp bwh backups clear [--dry-run]`.
+- Developer/testing helpers exposed in the admin bar (visible to users with `manage_options`).
+- Quickly clear BackWPup backup folders (`uploads/backwpup`, `uploads/backwpup-restore`) for repeatable test setups.
+- Toggle the `wp-content/bigFiles/.donotbackup` flag to simulate Big backup enabled/disabled states.
+- A confirmation modal prevents accidental removals during exploratory testing.
+- WP-CLI helpers for scripting and CI-friendly test flows: `wp bwh bigbackup status`, `wp bwh bigbackup toggle`, `wp bwh backups clear [--dry-run]`.
 
 Security & Best Practices
 
@@ -31,10 +33,11 @@ Installation
 wp plugin activate backwpup-helper
 ```
 
+
 Usage
 
-- Visit the front-end or admin while logged in as an administrator; the admin bar will show `BackWPup`.
-- Hover it to reveal submenu and use the provided actions.
+- Use the admin bar entry while logged in as a user with `manage_options` to access quick test actions.
+- Prefer the WP-CLI commands when scripting tests or running in CI; the CLI commands are easier to assert in automated flows.
 
 WP-CLI
 
@@ -68,10 +71,11 @@ Success: Removed: /path/to/wp-content/uploads/backwpup
 Success: Removed: /path/to/wp-content/uploads/backwpup-restore
 ```
 
+
 Testing
 
-- A simple smoke script is included at `tests/smoke-wpcli.sh` (requires the `wp` CLI and running from the WordPress root).
-- For automated unit testing, set up the WordPress PHPUnit test suite (not included). Use `BWH_Service` methods for isolated testing of filesystem behavior.
+- A smoke script is included at `tests/smoke-wpcli.sh` to exercise the CLI helpers (requires the `wp` CLI and running from the WordPress root).
+- For unit or integration tests, call `BWH_Service` methods directly to simulate filesystem behavior in isolation.
 
 Implementation notes
 

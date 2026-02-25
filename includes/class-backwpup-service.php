@@ -3,7 +3,9 @@
  * Shared service for BackWPup file operations and state checks.
  *
  * Centralizes path resolution, recursive removal, and flag toggling so logic
- * isn't duplicated between web/AJAX handlers and WP-CLI commands.
+ * isn't duplicated between web/AJAX handlers and WP-CLI commands. The
+ * service focuses on safe, test-friendly operations intended to simplify
+ * BackWPup testing and local development workflows.
  *
  * PHP: 7.4+ compatible
  */

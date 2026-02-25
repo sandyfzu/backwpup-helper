@@ -2,6 +2,11 @@
 /**
  * Core plugin class for BackWPup Helper
  *
+ * Provides lightweight developer and testing utilities for BackWPup. Exposes
+ * a discreet admin-topbar entry that helps operators and automated tests
+ * manage backup folders and toggle the "Big backup" flag without touching
+ * production configuration files manually.
+ *
  * Responsible for registering admin bar items, AJAX handlers, and asset enqueues.
  *
  * PHP compatibility: 7.4+ (no PHP 8.x-only features used)

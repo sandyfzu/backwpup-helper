@@ -1,7 +1,9 @@
 <?php
 /**
  * Plugin Name: BackWPup Helper
- * Description: Adds an admin-topbar helper to manage BackWPup backup folders and toggle Big backup state.
+ * Description: Developer/testing utilities to simplify BackWPup testing and development.
+ *              Adds a discreet admin-topbar entry to manage BackWPup backup folders
+ *              and toggle the "Big backup" state so tests and local workflows are easier.
  * Version: 1.0.0
  * Author: Sandy Figueroa
  * Text Domain: backwpup-helper
