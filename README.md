@@ -26,7 +26,7 @@ Security & Best Practices
 
 Installation
 
-1. Copy the `backwpup-helper` folder into `wp-content/plugins/`.
+1. Copy the `backwpup-helper` folder into `wp-content/plugins/` or **simply** download the zip from the [releases](https://github.com/sandyfzu/backwpup-helper/releases) page in the GitHub repository and install it in your WordPress as any other plugin.
 2. Activate the plugin from the WordPress admin Plugins screen or via WP-CLI:
 
 ```bash
