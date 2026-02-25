@@ -44,6 +44,17 @@ WP-CLI
 - `wp bwh bigbackup toggle` — toggles the `.donotbackup` flag.
 - `wp bwh backups clear [--dry-run]` — clears `backwpup` folders under uploads; use `--dry-run` to preview.
 
+About the Big backup flag
+
+BackWPup uses a simple, opt-out mechanism to skip directories during backup: if a directory contains a file named `.donotbackup`, BackWPup will ignore that directory and its contents when creating backups. This plugin exposes a convenient toggle that manages a flag file at `wp-content/bigFiles/.donotbackup` so you can simulate both smaller and larger backup runs.
+
+- When the flag file **exists** (`.donotbackup` present) the `bigFiles` directory is excluded from backups (Big backup is *inactive*).
+- When the flag file **does not exist** the `bigFiles` directory is included in backups (Big backup is *active*), which will make the backup significantly larger if the directory actually contains large files.
+
+Important: this toggle only affects backup size if `wp-content/bigFiles/` actually contains large files. If the directory is empty or only has small items, toggling the flag won't materially change the backup. Use the toggle to prepare reproducible test scenarios where you need to include or exclude heavy assets during BackWPup runs.
+
+You can create some full backups with BackWPup and move them to `wp-content/bigFiles/` to get large files.
+
 Examples
 
 ```bash
