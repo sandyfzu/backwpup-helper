@@ -106,6 +106,174 @@ class BWH_Service {
         return 'error';
     }
 
+    /* ---------------------------------------------------------------
+     * Debug log monitoring
+     * ------------------------------------------------------------- */
+
+    /**
+     * Maximum bytes to read from debug.log when serving content.
+     * Prevents memory exhaustion on very large log files.
+     */
+    const DEBUG_LOG_MAX_READ = 524288; // 512 KB
+
+    /**
+     * Option key used to persist the debug monitor on/off state.
+     *
+     * @see https://developer.wordpress.org/plugins/settings/options-api/
+     */
+    const DEBUG_MONITOR_OPTION = 'bwh_debug_monitor';
+
+    /**
+     * Resolve the path to WordPress debug.log.
+     *
+     * WP_DEBUG_LOG can be:
+     *  - (bool) true  → default path wp-content/debug.log
+     *  - (string)     → absolute custom path set in wp-config.php
+     *  - anything else → default path
+     *
+     * @see https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/
+     *
+     * @return string Absolute path to the debug log file.
+     */
+    public static function get_debug_log_path() {
+        if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) && '' !== WP_DEBUG_LOG ) {
+            return WP_DEBUG_LOG;
+        }
+        return WP_CONTENT_DIR . '/debug.log';
+    }
+
+    /**
+     * Whether the debug monitor feature is currently enabled.
+     *
+     * @return bool
+     */
+    public static function is_debug_monitor_active() {
+        return '1' === get_option( self::DEBUG_MONITOR_OPTION, '0' );
+    }
+
+    /**
+     * Toggle the debug monitor option and return the new state.
+     *
+     * @return string 'active'|'inactive'
+     */
+    public static function toggle_debug_monitor() {
+        $current = self::is_debug_monitor_active();
+        $new     = $current ? '0' : '1';
+        update_option( self::DEBUG_MONITOR_OPTION, $new, true );
+        return $new === '1' ? 'active' : 'inactive';
+    }
+
+    /**
+     * Return lightweight status information about debug.log.
+     *
+     * The fingerprint is built from mtime + size (single stat call, O(1))
+     * so JavaScript can detect changes without reading the file.
+     *
+     * @return array{exists: bool, size: int, size_human: string, fingerprint: string}
+     */
+    public static function get_debug_log_status() {
+        $path = self::get_debug_log_path();
+
+        if ( ! is_file( $path ) || ! is_readable( $path ) ) {
+            return array(
+                'exists'      => false,
+                'size'        => 0,
+                'size_human'  => '',
+                'fingerprint' => '',
+            );
+        }
+
+        // clearstatcache for this specific file to avoid stale data.
+        clearstatcache( true, $path );
+
+        $size  = (int) filesize( $path );
+        $mtime = (int) filemtime( $path );
+
+        return array(
+            'exists'      => true,
+            'size'        => $size,
+            'size_human'  => $size > 0 ? size_format( $size, 1 ) : '',
+            'fingerprint' => $mtime . '-' . $size,
+        );
+    }
+
+    /**
+     * Read the tail portion of the debug log file.
+     *
+     * If the file exceeds DEBUG_LOG_MAX_READ bytes the response will contain
+     * an indicator that the content was truncated, along with the total size
+     * in human-readable form.
+     *
+     * @return array{content: string, truncated: bool, total_size: string}|array{error: string}
+     */
+    public static function get_debug_log_content() {
+        $path = self::get_debug_log_path();
+
+        if ( ! is_file( $path ) || ! is_readable( $path ) ) {
+            return array( 'error' => 'File not found or not readable.' );
+        }
+
+        clearstatcache( true, $path );
+        $size = (int) filesize( $path );
+
+        if ( 0 === $size ) {
+            return array(
+                'content'    => '',
+                'truncated'  => false,
+                'total_size' => '0 B',
+            );
+        }
+
+        $truncated = false;
+        $handle    = fopen( $path, 'rb' );
+
+        if ( false === $handle ) {
+            return array( 'error' => 'Could not open file.' );
+        }
+
+        if ( $size > self::DEBUG_LOG_MAX_READ ) {
+            // Seek to the last DEBUG_LOG_MAX_READ bytes.
+            fseek( $handle, -self::DEBUG_LOG_MAX_READ, SEEK_END );
+            $truncated = true;
+        }
+
+        $content = fread( $handle, self::DEBUG_LOG_MAX_READ );
+        fclose( $handle );
+
+        if ( false === $content ) {
+            return array( 'error' => 'Could not read file.' );
+        }
+
+        return array(
+            'content'    => $content,
+            'truncated'  => $truncated,
+            'total_size' => size_format( $size, 1 ),
+        );
+    }
+
+    /**
+     * Delete the debug.log file.
+     *
+     * @return string 'deleted'|'not_found'|'error'
+     */
+    public static function delete_debug_log() {
+        $path = self::get_debug_log_path();
+
+        if ( ! is_file( $path ) ) {
+            return 'not_found';
+        }
+
+        if ( @unlink( $path ) ) {
+            return 'deleted';
+        }
+
+        return 'error';
+    }
+
+    /* ---------------------------------------------------------------
+     * Filesystem utilities
+     * ------------------------------------------------------------- */
+
     /**
      * Recursively remove a directory using SPL iterators.
      *

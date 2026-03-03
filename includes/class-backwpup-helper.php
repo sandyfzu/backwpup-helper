@@ -37,8 +37,15 @@ class BWH_Main {
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 
+        // Backup management AJAX.
         add_action( 'wp_ajax_bwh_clear_backups', array( $this, 'ajax_clear_backups' ) );
         add_action( 'wp_ajax_bwh_toggle_big_backup', array( $this, 'ajax_toggle_big_backup' ) );
+
+        // Debug monitor AJAX.
+        add_action( 'wp_ajax_bwh_toggle_debug_monitor', array( $this, 'ajax_toggle_debug_monitor' ) );
+        add_action( 'wp_ajax_bwh_debug_log_status', array( $this, 'ajax_debug_log_status' ) );
+        add_action( 'wp_ajax_bwh_debug_log_content', array( $this, 'ajax_debug_log_content' ) );
+        add_action( 'wp_ajax_bwh_delete_debug_log', array( $this, 'ajax_delete_debug_log' ) );
     }
 
     /**
@@ -76,15 +83,23 @@ class BWH_Main {
             'bwh-admin',
             'bwh_ajax',
             array(
-                'ajax_url' => admin_url( 'admin-ajax.php' ),
-                'nonce'    => wp_create_nonce( 'bwh_nonce' ),
-                'state'    => BWH_Service::is_bigbackup_active() ? 'active' : 'inactive',
+                'ajax_url'         => admin_url( 'admin-ajax.php' ),
+                'nonce'            => wp_create_nonce( 'bwh_nonce' ),
+                'state'            => BWH_Service::is_bigbackup_active() ? 'active' : 'inactive',
+                'debug_monitor'    => BWH_Service::is_debug_monitor_active() ? 'active' : 'inactive',
+                'debug_log_status' => BWH_Service::is_debug_monitor_active() ? BWH_Service::get_debug_log_status() : null,
+                'poll_interval'    => 10, // seconds
             )
         );
     }
 
     /**
      * Add entries to the WP Admin Bar
+     *
+     * Uses add_group() for visual separation between backup actions and
+     * debug monitor actions.
+     *
+     * @see https://developer.wordpress.org/reference/classes/wp_admin_bar/add_group/
      *
      * @param WP_Admin_Bar $wp_admin_bar
      */
@@ -124,6 +139,45 @@ class BWH_Main {
             'href'   => '#',
             'meta'   => array( 'class' => 'bwh-toggle', 'data-state' => $state ),
         ) );
+
+        /* ── Debug monitor group (visual separator) ── */
+        $wp_admin_bar->add_group( array(
+            'id'     => 'bwh_debug_group',
+            'parent' => 'bwh_root',
+            'meta'   => array( 'class' => 'ab-sub-secondary' ),
+        ) );
+
+        // Debug monitor toggle
+        $monitor_state = BWH_Service::is_debug_monitor_active() ? 'active' : 'inactive';
+
+        $wp_admin_bar->add_node( array(
+            'id'     => 'bwh_debug_monitor',
+            'parent' => 'bwh_debug_group',
+            'title'  => sprintf( 'Debug monitor: %s', $monitor_state ),
+            'href'   => '#',
+            'meta'   => array( 'class' => 'bwh-debug-monitor' ),
+        ) );
+
+        // Debug log status + viewer / delete — always render the nodes so JS can
+        // show/hide them based on monitor state and file presence.
+        $log_status = BWH_Service::get_debug_log_status();
+        $has_content = $log_status['exists'] && $log_status['size'] > 0;
+
+        $wp_admin_bar->add_node( array(
+            'id'     => 'bwh_debug_log',
+            'parent' => 'bwh_debug_group',
+            'title'  => 'Debug log: clear',
+            'href'   => '#',
+            'meta'   => array( 'class' => 'bwh-debug-log' ),
+        ) );
+
+        $wp_admin_bar->add_node( array(
+            'id'     => 'bwh_delete_debug_log',
+            'parent' => 'bwh_debug_group',
+            'title'  => 'Delete debug log',
+            'href'   => '#',
+            'meta'   => array( 'class' => 'bwh-delete-debug-log' ),
+        ) );
     }
 
     /**
@@ -158,11 +212,81 @@ class BWH_Main {
         wp_send_json_success( array( 'state' => $new_state ) );
     }
 
-    /**
-     * Return true if big backup is active (i.e., `.donotbackup` does NOT exist)
-     *
-     * @return bool
-     */
-    // Service methods moved to BackWPup_Service
+    /* ── Debug monitor AJAX handlers ── */
 
+    /**
+     * Toggle the debug monitor option (on/off) stored in wp_options.
+     */
+    public function ajax_toggle_debug_monitor() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'unauthorized', 403 );
+        }
+        check_ajax_referer( 'bwh_nonce', 'nonce' );
+
+        $new_state  = BWH_Service::toggle_debug_monitor();
+        $log_status = ( 'active' === $new_state ) ? BWH_Service::get_debug_log_status() : null;
+
+        wp_send_json_success( array(
+            'state'      => $new_state,
+            'log_status' => $log_status,
+        ) );
+    }
+
+    /**
+     * Return lightweight debug log status (no content).
+     * Used for polling from JavaScript.
+     */
+    public function ajax_debug_log_status() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'unauthorized', 403 );
+        }
+        check_ajax_referer( 'bwh_nonce', 'nonce' );
+
+        wp_send_json_success( BWH_Service::get_debug_log_status() );
+    }
+
+    /**
+     * Return the debug log file content (tail, max 512 KB).
+     * Called on-demand when the user requests the log viewer.
+     */
+    public function ajax_debug_log_content() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'unauthorized', 403 );
+        }
+        check_ajax_referer( 'bwh_nonce', 'nonce' );
+
+        $result = BWH_Service::get_debug_log_content();
+
+        if ( isset( $result['error'] ) ) {
+            wp_send_json_error( $result );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    /**
+     * Delete the debug.log file.
+     */
+    public function ajax_delete_debug_log() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'unauthorized', 403 );
+        }
+        check_ajax_referer( 'bwh_nonce', 'nonce' );
+
+        $result = BWH_Service::delete_debug_log();
+
+        if ( 'deleted' === $result ) {
+            wp_send_json_success( array(
+                'result'     => 'deleted',
+                'log_status' => BWH_Service::get_debug_log_status(),
+            ) );
+        } elseif ( 'not_found' === $result ) {
+            wp_send_json_success( array(
+                'result'     => 'not_found',
+                'log_status' => BWH_Service::get_debug_log_status(),
+            ) );
+        } else {
+            wp_send_json_error( array( 'result' => 'error' ) );
+        }
+    }
 }

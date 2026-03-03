@@ -1,39 +1,268 @@
-/* Styles for BackWPup Helper admin bar items */
-.bwh-state{
+/**
+ * BackWPup Helper — Admin bar & modal styles
+ *
+ * Sections:
+ *  1. State tags (active / inactive / amber)
+ *  2. Pulsing dot indicator (top-level admin bar)
+ *  3. Transient toast message
+ *  4. Confirmation modal (clear backups)
+ *  5. Log viewer modal (dark terminal theme)
+ */
+
+/* =================================================================
+ * 1. State tags
+ * ================================================================= */
+
+.bwh-state {
     display: inline;
     font-size: 11px;
     line-height: 1;
     margin-left: 6px;
 }
-.bwh-active{
-    color: #28a745; /* green tint */
-}
-.bwh-inactive{
-    color: #dc3545; /* red tint */
+
+.bwh-active {
+    color: #28a745; /* green */
 }
 
-/* transient message */
-.bwh-msg{
+.bwh-inactive {
+    color: #dc3545; /* red */
+}
+
+.bwh-amber {
+    color: #f0ad4e; /* amber — debug log has content */
+}
+
+/* =================================================================
+ * 2. Pulsing dot (on the root admin-bar item)
+ * ================================================================= */
+
+.bwh-pulse-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f0ad4e;
+    margin-left: 6px;
+    vertical-align: middle;
+    animation: bwh-pulse 1.5s ease-in-out infinite;
+    cursor: help; /* hint that the dot has a tooltip */
+}
+
+@keyframes bwh-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+}
+
+/* =================================================================
+ * 3. Transient toast message
+ * ================================================================= */
+
+.bwh-msg {
     position: fixed;
     right: 20px;
     bottom: 20px;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0, 0, 0, 0.8);
     color: #fff;
     padding: 8px 12px;
     border-radius: 4px;
-    z-index: 99999;
+    z-index: 100001;
+    font-size: 13px;
+    pointer-events: none;
+}
+
+/* =================================================================
+ * 4. Confirmation modal (clear backups)
+ * ================================================================= */
+
+#bwh-confirm-modal {
+    display: none;
+    position: fixed;
+    z-index: 99998;
+    left: 0; top: 0; right: 0; bottom: 0;
+}
+
+.bwh-modal-overlay {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.bwh-modal-container {
+    display: none;
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    z-index: 99998;
+}
+
+.bwh-modal {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    padding: 14px;
+    border-radius: 6px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.bwh-modal-body p {
+    margin: 0 0 12px;
+    color: #222;
+}
+
+.bwh-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.bwh-btn {
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: #f7f7f7;
+    cursor: pointer;
     font-size: 13px;
 }
 
-/* Modal styles */
-#bwh-confirm-modal{display:none;position:fixed;z-index:99998;left:0;top:0;right:0;bottom:0}
-.bwh-modal-overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.45)}
-.bwh-modal-container{display:none;position:fixed;left:0;top:0;right:0;bottom:0;z-index:99998}
-.bwh-modal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:14px;border-radius:6px;max-width:420px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3)}
-.bwh-modal-body p{margin:0 0 12px;color:#222}
-.bwh-modal-actions{display:flex;gap:8px;justify-content:flex-end}
-.bwh-btn{padding:6px 10px;border-radius:4px;border:1px solid #ccc;background:#f7f7f7;cursor:pointer}
-.bwh-btn.bwh-confirm{background:transparent;color:#fff;border-color:#c0392b}
-.bwh-btn.bwh-confirm{background:#c0392b;color:#fff}
-.bwh-btn.bwh-cancel{background:#fff}
+.bwh-btn.bwh-confirm {
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+}
 
+.bwh-btn.bwh-cancel {
+    background: #fff;
+}
+
+/* =================================================================
+ * 5. Log viewer modal (dark terminal theme)
+ * ================================================================= */
+
+.bwh-logviewer-container {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bwh-logviewer-overlay {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.bwh-logviewer-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 90vw;
+    max-height: 80vh;
+    width: 860px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+/* Header */
+.bwh-logviewer-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #181825;
+    border-bottom: 1px solid #313244;
+    flex-shrink: 0;
+}
+
+.bwh-logviewer-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: #cdd6f4;
+    white-space: nowrap;
+}
+
+.bwh-logviewer-meta {
+    font-size: 11px;
+    color: #a6adc8;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bwh-logviewer-header-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.bwh-logviewer-btn {
+    background: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+
+.bwh-logviewer-btn:hover {
+    background: #45475a;
+}
+
+.bwh-logviewer-close {
+    font-size: 15px;
+    line-height: 1;
+    padding: 4px 8px;
+}
+
+/* Body / content */
+.bwh-logviewer-body {
+    position: relative;
+    flex: 1;
+    overflow: auto;
+    padding: 12px 14px;
+}
+
+.bwh-logviewer-content {
+    margin: 0;
+    padding: 0;
+    white-space: pre;
+    word-break: break-all;
+    color: #cdd6f4;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+/* Scroll-to-bottom floating button */
+.bwh-logviewer-scroll-bottom {
+    position: sticky;
+    bottom: 8px;
+    float: right;
+    background: #45475a;
+    color: #cdd6f4;
+    border: 1px solid #585b70;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    opacity: 0.85;
+    transition: opacity 0.15s;
+}
+
+.bwh-logviewer-scroll-bottom:hover {
+    opacity: 1;
+}
