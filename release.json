@@ -1,12 +1,12 @@
 {
   "name": "BackWPup Helper",
   "version": "1.2.0",
-  "download_url": "https://raw.githubusercontent.com/OWNER/REPO/main/releases/backwpup-helper-1.2.0.zip",
-  "homepage": "https://github.com/OWNER/REPO",
+  "download_url": "https://github.com/sandyfzu/backwpup-helper/releases/download/v1.2.0/backwpup-helper-v1.2.0.zip",
+  "homepage": "https://github.com/sandyfzu/backwpup-helper",
   "author": "Sandy Figueroa",
   "requires": "6.9",
   "requires_php": "7.4",
-  "tested": "6.4",
+  "tested": "6.9",
   "last_updated": "2026-03-04",
   "sections": {
     "description": "<p>Developer/testing utilities to simplify BackWPup testing and development. Adds an admin-topbar entry to manage BackWPup backup folders and toggle the 'Big backup' state for testing workflows.</p>",
