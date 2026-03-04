@@ -36,7 +36,7 @@ function bwh_init_plugin() {
 	$plugin = new BWH_Main();
 	$plugin->init();
 
-	$updater = new BWH_Updater( BWH_PLUGIN_FILE, BWH_VERSION, 'https://bwh.com/update.json' );
+	$updater = new BWH_Updater( BWH_PLUGIN_FILE, BWH_VERSION, 'https://raw.githubusercontent.com/sandyfzu/backwpup-helper/refs/heads/main/release.json' );
 	$updater->init();
 }
 
