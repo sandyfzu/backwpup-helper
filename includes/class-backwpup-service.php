@@ -21,6 +21,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BWH_Service {
 
     /**
+     * Transient key for caching backup directory size info.
+     */
+    const BACKUP_DIR_INFO_TRANSIENT = 'bwh_backup_dir_info';
+
+    /**
+     * TTL (seconds) for backup directory info cache.
+     */
+    const BACKUP_DIR_INFO_TTL = 20;
+
+    /**
      * Return uploads base directory reliably using WP API.
      *
      * @return string
@@ -58,7 +68,97 @@ class BWH_Service {
             }
         }
 
+        // Invalidate cached size info after any clear attempt.
+        delete_transient( self::BACKUP_DIR_INFO_TRANSIENT );
+
         return $results;
+    }
+
+    /**
+     * Return size information about the uploads/backwpup directory.
+     *
+     * Walks the directory tree with SPL iterators to sum file sizes.
+     * Used for the admin-bar hover refresh display.
+     *
+     * @return array{exists: bool, size: int, size_human: string, file_count: int}
+     */
+    public static function get_backup_dir_info() {
+        $cached = get_transient( self::BACKUP_DIR_INFO_TRANSIENT );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+
+        $dir = self::get_uploads_base() . '/backwpup';
+
+        if ( ! is_dir( $dir ) ) {
+            $result = array(
+                'exists'     => false,
+                'size'       => 0,
+                'size_human' => '',
+                'file_count' => 0,
+            );
+            set_transient( self::BACKUP_DIR_INFO_TRANSIENT, $result, self::BACKUP_DIR_INFO_TTL );
+            return $result;
+        }
+
+        $size  = 0;
+        $count = 0;
+
+        try {
+            $it = new RecursiveDirectoryIterator( $dir, RecursiveDirectoryIterator::SKIP_DOTS );
+            $ri = new RecursiveIteratorIterator( $it, RecursiveIteratorIterator::LEAVES_ONLY );
+            foreach ( $ri as $file ) {
+                if ( $file->isFile() ) {
+                    $size += $file->getSize();
+                    $count++;
+                }
+            }
+        } catch ( Exception $e ) {
+            $result = array(
+                'exists'     => true,
+                'size'       => 0,
+                'size_human' => '',
+                'file_count' => 0,
+            );
+            set_transient( self::BACKUP_DIR_INFO_TRANSIENT, $result, self::BACKUP_DIR_INFO_TTL );
+            return $result;
+        }
+
+        // Treat empty directory as non-existent for display purposes.
+        if ( 0 === $count ) {
+            $result = array(
+                'exists'     => false,
+                'size'       => 0,
+                'size_human' => '',
+                'file_count' => 0,
+            );
+            set_transient( self::BACKUP_DIR_INFO_TRANSIENT, $result, self::BACKUP_DIR_INFO_TTL );
+            return $result;
+        }
+
+        $result = array(
+            'exists'     => true,
+            'size'       => $size,
+            'size_human' => size_format( $size, 1 ),
+            'file_count' => $count,
+        );
+
+        set_transient( self::BACKUP_DIR_INFO_TRANSIENT, $result, self::BACKUP_DIR_INFO_TTL );
+        return $result;
+    }
+
+    /**
+     * Aggregate data returned on admin-bar hover refresh.
+     *
+     * Designed to be extended with additional keys in the future
+     * without requiring new JavaScript code or AJAX endpoints.
+     *
+     * @return array<string, mixed>
+     */
+    public static function get_hover_data() {
+        return array(
+            'backup_dir' => self::get_backup_dir_info(),
+        );
     }
 
     /**

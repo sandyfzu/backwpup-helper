@@ -46,6 +46,9 @@ class BWH_Main {
         add_action( 'wp_ajax_bwh_debug_log_status', array( $this, 'ajax_debug_log_status' ) );
         add_action( 'wp_ajax_bwh_debug_log_content', array( $this, 'ajax_debug_log_content' ) );
         add_action( 'wp_ajax_bwh_delete_debug_log', array( $this, 'ajax_delete_debug_log' ) );
+
+        // Hover refresh AJAX (generic admin-bar hover data).
+        add_action( 'wp_ajax_bwh_hover_refresh', array( $this, 'ajax_hover_refresh' ) );
     }
 
     /**
@@ -89,6 +92,7 @@ class BWH_Main {
                 'debug_monitor'    => BWH_Service::is_debug_monitor_active() ? 'active' : 'inactive',
                 'debug_log_status' => BWH_Service::is_debug_monitor_active() ? BWH_Service::get_debug_log_status() : null,
                 'poll_interval'    => 10, // seconds
+                'hover_data'       => BWH_Service::get_hover_data(),
             )
         );
     }
@@ -129,6 +133,16 @@ class BWH_Main {
             'meta'   => array( 'class' => 'bwh-clear' ),
         ) );
 
+        // Backup data size (informational, refreshed on hover via JS)
+        $backup_info = BWH_Service::get_backup_dir_info();
+        $wp_admin_bar->add_node( array(
+            'id'     => 'bwh_backup_size',
+            'parent' => 'bwh_root',
+            'title'  => $backup_info['exists'] ? sprintf( 'Backup data: %s', $backup_info['size_human'] ) : '',
+            'href'   => false,
+            'meta'   => array( 'class' => 'bwh-backup-size' ),
+        ) );
+
         // Big backup state (initial text will be updated by JS for colored tag)
         $state = BWH_Service::is_bigbackup_active() ? 'active' : 'inactive';
 
@@ -158,15 +172,10 @@ class BWH_Main {
             'meta'   => array( 'class' => 'bwh-debug-monitor' ),
         ) );
 
-        // Debug log status + viewer / delete — always render the nodes so JS can
-        // show/hide them based on monitor state and file presence.
-        $log_status = BWH_Service::get_debug_log_status();
-        $has_content = $log_status['exists'] && $log_status['size'] > 0;
-
         $wp_admin_bar->add_node( array(
             'id'     => 'bwh_debug_log',
             'parent' => 'bwh_debug_group',
-            'title'  => 'Debug log: clear',
+            'title'  => 'Debug log: nothing in logs',
             'href'   => '#',
             'meta'   => array( 'class' => 'bwh-debug-log' ),
         ) );
@@ -288,5 +297,22 @@ class BWH_Main {
         } else {
             wp_send_json_error( array( 'result' => 'error' ) );
         }
+    }
+
+    /* ── Generic hover refresh ── */
+
+    /**
+     * Return aggregated data for admin bar hover refresh.
+     *
+     * Designed as a single endpoint for all admin-bar data that should be
+     * updated on hover, so future additions don't require new AJAX actions.
+     */
+    public function ajax_hover_refresh() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'unauthorized', 403 );
+        }
+        check_ajax_referer( 'bwh_nonce', 'nonce' );
+
+        wp_send_json_success( BWH_Service::get_hover_data() );
     }
 }

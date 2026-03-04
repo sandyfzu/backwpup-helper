@@ -5,8 +5,9 @@
  *  1. State tags (active / inactive / amber)
  *  2. Pulsing dot indicator (top-level admin bar)
  *  3. Transient toast message
- *  4. Confirmation modal (clear backups)
+ *  4. Confirmation modal
  *  5. Log viewer modal (dark terminal theme)
+ *  6. Backup size info (non-interactive admin bar item)
  */
 
 /* =================================================================
@@ -32,11 +33,23 @@
     color: #f0ad4e; /* amber — debug log has content */
 }
 
+.bwh-dimmed {
+    color: #a6adb4;
+    opacity: 0.85;
+}
+
+#wpadminbar .bwh-item-dimmed > .ab-item,
+#wpadminbar .bwh-item-dimmed > .ab-item:hover {
+    color: #a6adb4 !important;
+    font-style: italic;
+}
+
 /* =================================================================
  * 2. Pulsing dot (on the root admin-bar item)
+ *    Uses #wpadminbar for specificity over admin bar defaults.
  * ================================================================= */
 
-.bwh-pulse-dot {
+#wpadminbar .bwh-pulse-dot {
     display: inline-block;
     width: 8px;
     height: 8px;
@@ -53,33 +66,71 @@
     50%      { opacity: 1; }
 }
 
+.bwh-pulse-text {
+    color: #f0ad4e;
+    animation: bwh-pulse 1.5s ease-in-out infinite;
+}
+
 /* =================================================================
  * 3. Transient toast message
  * ================================================================= */
 
-.bwh-msg {
+.bwh-toast-stack {
     position: fixed;
     right: 20px;
-    bottom: 20px;
-    background: rgba(0, 0, 0, 0.8);
-    color: #fff;
-    padding: 8px 12px;
-    border-radius: 4px;
+    top: 50px; /* below admin bar (32px) */
     z-index: 100001;
-    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
     pointer-events: none;
+}
+
+.bwh-msg {
+    background: rgba(0, 0, 0, 0.88);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    min-width: 180px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+    transition:
+        opacity 220ms ease,
+        transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.bwh-msg-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.bwh-msg-leaving {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+}
+
+.bwh-msg-clickable {
+    cursor: pointer;
+}
+
+.bwh-msg-clickable:hover {
+    background: rgba(20, 20, 20, 0.92);
+}
+
+.bwh-msg-change {
+    text-align: left;
+    max-width: 420px;
+    line-height: 1.35;
 }
 
 /* =================================================================
  * 4. Confirmation modal (clear backups)
  * ================================================================= */
-
-#bwh-confirm-modal {
-    display: none;
-    position: fixed;
-    z-index: 99998;
-    left: 0; top: 0; right: 0; bottom: 0;
-}
 
 .bwh-modal-overlay {
     position: fixed;
@@ -88,7 +139,6 @@
 }
 
 .bwh-modal-container {
-    display: none;
     position: fixed;
     left: 0; top: 0; right: 0; bottom: 0;
     z-index: 99998;
@@ -232,15 +282,37 @@
 .bwh-logviewer-body {
     position: relative;
     flex: 1;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: 12px 14px;
+    scrollbar-width: thin;                    /* Firefox */
+    scrollbar-color: #45475a #1e1e2e;         /* Firefox */
+}
+
+.bwh-logviewer-body::-webkit-scrollbar {
+    width: 10px;
+}
+
+.bwh-logviewer-body::-webkit-scrollbar-track {
+    background: #1e1e2e;
+    border-radius: 5px;
+}
+
+.bwh-logviewer-body::-webkit-scrollbar-thumb {
+    background: #45475a;
+    border-radius: 5px;
+}
+
+.bwh-logviewer-body::-webkit-scrollbar-thumb:hover {
+    background: #585b70;
 }
 
 .bwh-logviewer-content {
     margin: 0;
     padding: 0;
-    white-space: pre;
-    word-break: break-all;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     color: #cdd6f4;
     user-select: text;
     -webkit-user-select: text;
@@ -266,3 +338,15 @@
 .bwh-logviewer-scroll-bottom:hover {
     opacity: 1;
 }
+
+/* =================================================================
+ * 6. Backup size info (non-interactive admin bar item)
+ * ================================================================= */
+
+#wpadminbar .bwh-backup-size > .ab-item,
+#wpadminbar .bwh-backup-size > .ab-item:hover {
+    cursor: default;
+    opacity: 0.75;
+    font-style: italic;
+}
+

@@ -36,6 +36,29 @@
     }
 
     /**
+     * Get the direct admin-bar item element (<a> or <div>) for a node.
+     *
+     * Important for root items where href=false, because WordPress renders
+     * a non-anchor `.ab-item`. We must avoid querying descendant submenu links.
+     *
+     * @param {string} id
+     * @returns {HTMLElement|null}
+     */
+    function getBarItem(id) {
+        var node = getBarNode(id);
+        if (!node) return null;
+
+        var children = node.children;
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].classList && children[i].classList.contains('ab-item')) {
+                return children[i];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Render a coloured state tag inside an anchor.
      * @param {HTMLAnchorElement} anchor
      * @param {string}           label  - Prefix text (e.g. "Big backup")
@@ -76,17 +99,265 @@
     }
 
     /**
+     * Ensure the singleton toast stack container exists.
+     * @returns {HTMLElement}
+     */
+    function ensureToastStack() {
+        var existing = document.getElementById('bwh-toast-stack');
+        if (existing) return existing;
+
+        var stack = document.createElement('div');
+        stack.id = 'bwh-toast-stack';
+        stack.className = 'bwh-toast-stack';
+        document.body.appendChild(stack);
+        return stack;
+    }
+
+    /**
+     * Capture current toast top positions for FLIP animations.
+     * @param {HTMLElement} container
+     * @returns {Object<string, number>}
+     */
+    function captureToastPositions(container) {
+        var map = {};
+        var items = container.children;
+        for (var i = 0; i < items.length; i++) {
+            var el = items[i];
+            var id = el.getAttribute('data-toast-id');
+            if (id) {
+                map[id] = el.getBoundingClientRect().top;
+            }
+        }
+        return map;
+    }
+
+    /**
+     * Animate existing toast vertical movement after insert/remove.
+     * @param {HTMLElement} container
+     * @param {Object<string, number>} before
+     */
+    function animateToastStack(container, before) {
+        var items = container.children;
+        for (var i = 0; i < items.length; i++) {
+            var el = items[i];
+            var id = el.getAttribute('data-toast-id');
+            if (!id || typeof before[id] !== 'number') continue;
+
+            var nowTop = el.getBoundingClientRect().top;
+            var delta = before[id] - nowTop;
+            if (!delta) continue;
+
+            if (typeof el.animate === 'function') {
+                el.animate(
+                    [
+                        { transform: 'translateY(' + delta + 'px)' },
+                        { transform: 'translateY(0)' }
+                    ],
+                    {
+                        duration: 240,
+                        easing: 'cubic-bezier(0.2, 0, 0, 1)'
+                    }
+                );
+            }
+        }
+    }
+
+    /**
+     * Remove a toast with exit animation and stack reflow animation.
+     * @param {HTMLElement} toast
+     */
+    function removeToast(toast) {
+        if (!toast || toast.__removing) return;
+        toast.__removing = true;
+
+        if (toast.__timer) {
+            clearTimeout(toast.__timer);
+            toast.__timer = null;
+        }
+
+        var container = toast.parentNode;
+        if (!container) return;
+
+        var before = captureToastPositions(container);
+        toast.classList.remove('bwh-msg-visible');
+        toast.classList.add('bwh-msg-leaving');
+
+        setTimeout(function () {
+            if (!toast.parentNode) return;
+            toast.parentNode.removeChild(toast);
+            animateToastStack(container, before);
+
+            if (!container.children.length && container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        }, 240);
+    }
+
+    /**
+     * Create and enqueue a toast at the top of the stack.
+     * @param {Object} opts
+     * @param {string} [opts.text]
+     * @param {Node} [opts.content]
+     * @param {number} [opts.duration]
+     * @param {string} [opts.className]
+     * @param {Function} [opts.onClick]
+     */
+    function enqueueToast(opts) {
+        var container = ensureToastStack();
+        var before = captureToastPositions(container);
+
+        var toast = document.createElement('div');
+        toast.className = 'bwh-msg';
+        if (opts && opts.className) {
+            toast.className += ' ' + opts.className;
+        }
+
+        toast.setAttribute('data-toast-id', String(Date.now()) + '-' + String(Math.random()).slice(2, 8));
+
+        if (opts && opts.content) {
+            toast.appendChild(opts.content);
+        } else {
+            toast.textContent = opts && opts.text ? opts.text : '';
+        }
+
+        if (opts && typeof opts.onClick === 'function') {
+            toast.classList.add('bwh-msg-clickable');
+            toast.setAttribute('role', 'button');
+            toast.tabIndex = 0;
+            toast.addEventListener('click', function () {
+                try {
+                    opts.onClick();
+                } catch (_) {
+                    // ignore handler failures to keep toast system resilient
+                }
+                removeToast(toast);
+            });
+            toast.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    try {
+                        opts.onClick();
+                    } catch (_) {
+                        // ignore handler failures
+                    }
+                    removeToast(toast);
+                }
+            });
+        }
+
+        container.insertBefore(toast, container.firstChild);
+        animateToastStack(container, before);
+
+        requestAnimationFrame(function () {
+            toast.classList.add('bwh-msg-visible');
+        });
+
+        var duration = (opts && typeof opts.duration === 'number') ? opts.duration : 3000;
+        toast.__timer = setTimeout(function () {
+            removeToast(toast);
+        }, duration);
+    }
+
+    /**
      * Show a transient toast message.
      * @param {string} msg
      */
     function showMessage(msg) {
-        var el = document.createElement('div');
-        el.className = 'bwh-msg';
-        el.textContent = msg;
-        document.body.appendChild(el);
-        setTimeout(function () {
-            if (el.parentNode) el.parentNode.removeChild(el);
-        }, 3000);
+        enqueueToast({ text: msg, duration: 3000 });
+    }
+
+    /**
+     * Show a one-off toast when new debug log changes are detected.
+     * @param {Function} [onClick]
+     */
+    function showDebugChangedToast(onClick) {
+        var content = document.createElement('span');
+        content.appendChild(document.createTextNode('Debug log '));
+
+        var changed = document.createElement('span');
+        changed.className = 'bwh-pulse-text';
+        changed.textContent = 'changed';
+        content.appendChild(changed);
+
+        content.appendChild(document.createTextNode(' — click to view the latest entries.'));
+
+        enqueueToast({
+            content: content,
+            className: 'bwh-msg-change',
+            duration: 4800,
+            onClick: onClick
+        });
+    }
+
+    /**
+     * Show a reusable confirmation modal.
+     *
+     * Creates a modal on the fly, shows it, and removes it from the DOM on
+     * close. This avoids stale state and allows different text per invocation.
+     *
+     * @param {Object}   opts
+     * @param {string}   opts.message     - Confirmation message text.
+     * @param {string}   opts.confirmText - Label for the confirm button.
+     * @param {string}   [opts.cancelText='Cancel'] - Label for the cancel button.
+     * @param {Function} opts.onConfirm   - Callback invoked on confirmation.
+     */
+    function showConfirmModal(opts) {
+        var existing = document.getElementById('bwh-confirm-modal');
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+        var container = document.createElement('div');
+        container.id = 'bwh-confirm-modal';
+        container.className = 'bwh-modal-container';
+
+        var overlay = document.createElement('div');
+        overlay.className = 'bwh-modal-overlay';
+
+        var box = document.createElement('div');
+        box.className = 'bwh-modal';
+
+        var body = document.createElement('div');
+        body.className = 'bwh-modal-body';
+
+        var p = document.createElement('p');
+        p.textContent = opts.message || 'Are you sure?';
+
+        var actions = document.createElement('div');
+        actions.className = 'bwh-modal-actions';
+
+        var btnConfirm = document.createElement('button');
+        btnConfirm.className = 'bwh-btn bwh-confirm';
+        btnConfirm.textContent = opts.confirmText || 'Confirm';
+
+        var btnCancel = document.createElement('button');
+        btnCancel.className = 'bwh-btn bwh-cancel';
+        btnCancel.textContent = opts.cancelText || 'Cancel';
+
+        actions.appendChild(btnCancel);
+        actions.appendChild(btnConfirm);
+        body.appendChild(p);
+        body.appendChild(actions);
+        box.appendChild(body);
+        container.appendChild(overlay);
+        container.appendChild(box);
+        document.body.appendChild(container);
+
+        function closeModal() {
+            if (container.parentNode) container.parentNode.removeChild(container);
+            document.removeEventListener('keydown', onEsc);
+        }
+
+        function onEsc(ev) {
+            if (ev.key === 'Escape') closeModal();
+        }
+
+        btnCancel.addEventListener('click', closeModal);
+        overlay.addEventListener('click', closeModal);
+        document.addEventListener('keydown', onEsc);
+
+        btnConfirm.addEventListener('click', function () {
+            closeModal();
+            if (typeof opts.onConfirm === 'function') opts.onConfirm();
+        });
     }
 
     /* ================================================================
@@ -104,13 +375,114 @@
         var deleteLogAnchor     = getAnchor('bwh_delete_debug_log');
         var debugLogNode        = getBarNode('bwh_debug_log');
         var deleteLogNode       = getBarNode('bwh_delete_debug_log');
-        var rootAnchor          = getAnchor('bwh_root');
+        var rootItem            = getBarItem('bwh_root');
+        var rootNode            = getBarNode('bwh_root');
+        var backupSizeNode      = getBarNode('bwh_backup_size');
+        var backupSizeItem      = getBarItem('bwh_backup_size');
+
+        var STORAGE_KEY = 'bwh_debug_indicator_state_v1';
+        var STATE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
         /* ── State ── */
         var monitorActive   = bwh_ajax.debug_monitor === 'active';
-        var lastFingerprint = '';
+        var latestFingerprint = '';
+        var acknowledgedFingerprint = '';
+        var notifiedFingerprint = '';
+        var logHasContent = false;
+        var currentLogStatus = null;
+        var handleDebugChangedToastClick = null;
         var pollTimer       = null;
+        var pollInFlight    = false;
         var pulsingDot      = null; // reference to the dot element on root
+
+        /**
+         * Safely read state from localStorage.
+         * @returns {Object|null}
+         */
+        function readStoredState() {
+            try {
+                var raw = window.localStorage.getItem(STORAGE_KEY);
+                if (!raw) return null;
+                var parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== 'object') return null;
+                return parsed;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        /**
+         * Safely persist indicator state.
+         */
+        function writeStoredState() {
+            try {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    latestFingerprint: latestFingerprint || '',
+                    acknowledgedFingerprint: acknowledgedFingerprint || '',
+                    notifiedFingerprint: notifiedFingerprint || '',
+                    updatedAt: Date.now()
+                }));
+            } catch (_) {
+                // Storage can fail (private mode, blocked storage, quota). Ignore safely.
+            }
+        }
+
+        /**
+         * Clear stored indicator state.
+         */
+        function clearStoredState() {
+            try {
+                window.localStorage.removeItem(STORAGE_KEY);
+            } catch (_) {
+                // ignore safely
+            }
+        }
+
+        /**
+         * Whether current state has an unseen change.
+         * @returns {boolean}
+         */
+        function hasUnseenChange() {
+            return !!(
+                monitorActive &&
+                logHasContent &&
+                latestFingerprint &&
+                latestFingerprint !== acknowledgedFingerprint
+            );
+        }
+
+        /**
+         * Render debug log anchor in "has content" mode.
+         * @param {Object} logStatus
+         * @param {boolean} unseen
+         */
+        function renderDebugLogHasContent(logStatus, unseen) {
+            if (!debugLogAnchor) return;
+
+            debugLogAnchor.textContent = '';
+
+            var lbl = document.createTextNode('Debug log: ');
+            var sz = document.createElement('span');
+            sz.className = 'bwh-state bwh-amber';
+            sz.textContent = logStatus.size_human;
+
+            debugLogAnchor.appendChild(lbl);
+            debugLogAnchor.appendChild(sz);
+
+            if (unseen) {
+                var changed = document.createElement('span');
+                changed.className = 'bwh-state bwh-pulse-text';
+                changed.textContent = ' changed';
+                debugLogAnchor.appendChild(changed);
+            }
+
+            var hint = document.createElement('span');
+            hint.className = 'bwh-state';
+            hint.textContent = ' (click to view)';
+            debugLogAnchor.appendChild(hint);
+
+            debugLogAnchor.style.cursor = 'pointer';
+        }
 
         /* ================================================================
          * 1. Big backup toggle
@@ -138,74 +510,26 @@
          * 2. Clear backup data (with confirmation modal)
          * ================================================================ */
 
-        function createConfirmModal() {
-            if (document.getElementById('bwh-confirm-modal')) return;
-
-            var overlay = document.createElement('div');
-            overlay.className = 'bwh-modal-overlay';
-
-            var modal = document.createElement('div');
-            modal.id = 'bwh-confirm-modal';
-            modal.className = 'bwh-modal-container';
-            modal.style.display = 'none';
-
-            var box = document.createElement('div');
-            box.className = 'bwh-modal';
-
-            var body = document.createElement('div');
-            body.className = 'bwh-modal-body';
-
-            var p = document.createElement('p');
-            p.textContent = 'Are you sure you want to permanently remove BackWPup backup folders from uploads?';
-
-            var actions = document.createElement('div');
-            actions.className = 'bwh-modal-actions';
-
-            var btnConfirm = document.createElement('button');
-            btnConfirm.className = 'bwh-btn bwh-confirm';
-            btnConfirm.textContent = 'Remove';
-
-            var btnCancel = document.createElement('button');
-            btnCancel.className = 'bwh-btn bwh-cancel';
-            btnCancel.textContent = 'Cancel';
-
-            actions.appendChild(btnCancel);
-            actions.appendChild(btnConfirm);
-            body.appendChild(p);
-            body.appendChild(actions);
-            box.appendChild(body);
-            modal.appendChild(overlay);
-            modal.appendChild(box);
-            document.body.appendChild(modal);
-
-            function closeModal() { modal.style.display = 'none'; }
-
-            btnCancel.addEventListener('click', closeModal);
-            overlay.addEventListener('click', closeModal);
-            document.addEventListener('keydown', function (ev) {
-                if (ev.key === 'Escape' && modal.style.display !== 'none') closeModal();
-            });
-
-            btnConfirm.addEventListener('click', function () {
-                closeModal();
-                post(makeForm('bwh_clear_backups'))
-                    .then(function (data) {
-                        if (data && data.success) {
-                            showMessage('Backups cleared.');
-                        } else {
-                            showMessage('Nothing to remove or error occurred.');
-                        }
-                    })
-                    .catch(function () { showMessage('Request failed.'); });
-            });
-        }
-
         if (clearAnchor) {
             clearAnchor.addEventListener('click', function (e) {
                 e.preventDefault();
-                createConfirmModal();
-                var modal = document.getElementById('bwh-confirm-modal');
-                if (modal) modal.style.display = 'block';
+                showConfirmModal({
+                    message: 'Are you sure you want to permanently remove BackWPup backup folders from uploads?',
+                    confirmText: 'Remove',
+                    onConfirm: function () {
+                        post(makeForm('bwh_clear_backups'))
+                            .then(function (data) {
+                                if (data && data.success) {
+                                    showMessage('Backups cleared.');
+                                    updateBackupSizeNode({ exists: false });
+                                    lastHoverRefresh = 0;
+                                } else {
+                                    showMessage('Nothing to remove or error occurred.');
+                                }
+                            })
+                            .catch(function () { showMessage('Request failed.'); });
+                    }
+                });
             });
         }
 
@@ -216,22 +540,68 @@
         /* ── 3a. Pulsing indicator dot on the top-level root item ── */
 
         function ensurePulsingDot() {
-            if (pulsingDot || !rootAnchor) return;
+            if (pulsingDot || !rootItem) return;
             pulsingDot = document.createElement('span');
             pulsingDot.className = 'bwh-pulse-dot';
             // Native title attribute → browser provides a built-in tooltip.
             pulsingDot.title = 'Debug log has changed since last viewed';
             pulsingDot.style.display = 'none';
-            rootAnchor.appendChild(pulsingDot);
+            rootItem.appendChild(pulsingDot);
         }
 
         function showPulsingDot() {
             ensurePulsingDot();
-            if (pulsingDot) pulsingDot.style.display = '';
+            if (pulsingDot) pulsingDot.style.display = 'inline-block';
         }
 
         function hidePulsingDot() {
             if (pulsingDot) pulsingDot.style.display = 'none';
+        }
+
+        /**
+         * Render linked change indicators.
+         *
+         * @param {boolean} visible
+         */
+        function setChangeIndicatorsVisible(visible) {
+            if (visible) {
+                showPulsingDot();
+            } else {
+                hidePulsingDot();
+            }
+        }
+
+        /**
+         * Derive visibility from latest vs acknowledged fingerprint.
+         */
+        function renderChangeIndicators() {
+            var unseen = hasUnseenChange();
+            setChangeIndicatorsVisible(unseen);
+
+            if (monitorActive && logHasContent && currentLogStatus) {
+                renderDebugLogHasContent(currentLogStatus, unseen);
+            }
+
+            if (unseen && latestFingerprint && latestFingerprint !== notifiedFingerprint) {
+                showDebugChangedToast(handleDebugChangedToastClick);
+                notifiedFingerprint = latestFingerprint;
+            }
+
+            if (!monitorActive || !logHasContent) {
+                notifiedFingerprint = '';
+            }
+
+            writeStoredState();
+        }
+
+        /**
+         * Mark current log state as acknowledged by the user.
+         */
+        function acknowledgeCurrentChange() {
+            if (latestFingerprint) {
+                acknowledgedFingerprint = latestFingerprint;
+            }
+            renderChangeIndicators();
         }
 
         /* ── 3b. Debug log sub-item visibility ── */
@@ -242,11 +612,15 @@
          */
         function updateDebugLogUI(logStatus) {
             if (!debugLogNode || !deleteLogNode) return;
+            currentLogStatus = logStatus;
 
             // Hide both items when monitor is inactive.
             if (!monitorActive) {
                 debugLogNode.style.display = 'none';
                 deleteLogNode.style.display = 'none';
+                logHasContent = false;
+                currentLogStatus = null;
+                renderChangeIndicators();
                 return;
             }
 
@@ -254,38 +628,45 @@
             debugLogNode.style.display = '';
 
             if (!logStatus || !logStatus.exists || logStatus.size === 0) {
+                logHasContent = false;
+                latestFingerprint = '';
+                acknowledgedFingerprint = '';
+                currentLogStatus = null;
+
+                if (debugLogNode && debugLogNode.classList) {
+                    debugLogNode.classList.add('bwh-item-dimmed');
+                }
+
                 // Log is empty or missing.
                 if (debugLogAnchor) {
                     debugLogAnchor.textContent = '';
                     var label = document.createTextNode('Debug log: ');
                     var span = document.createElement('span');
                     span.className = 'bwh-state bwh-active';
-                    span.textContent = 'clear';
+                    span.textContent = 'nothing in logs';
                     debugLogAnchor.appendChild(label);
                     debugLogAnchor.appendChild(span);
                     debugLogAnchor.style.cursor = 'default';
                 }
                 deleteLogNode.style.display = 'none';
             } else {
-                // Log has content — show size in amber, make clickable.
-                if (debugLogAnchor) {
-                    debugLogAnchor.textContent = '';
-                    var lbl = document.createTextNode('Debug log: ');
-                    var sz = document.createElement('span');
-                    sz.className = 'bwh-state bwh-amber';
-                    sz.textContent = logStatus.size_human;
-                    debugLogAnchor.appendChild(lbl);
-                    debugLogAnchor.appendChild(sz);
-                    debugLogAnchor.style.cursor = 'pointer';
+                logHasContent = true;
+                latestFingerprint = logStatus.fingerprint || '';
+                if (debugLogNode && debugLogNode.classList) {
+                    debugLogNode.classList.remove('bwh-item-dimmed');
                 }
                 deleteLogNode.style.display = '';
             }
+
+            renderChangeIndicators();
         }
 
         /* ── 3c. Polling ── */
 
         function doPoll() {
-            if (!monitorActive) return;
+            if (!monitorActive || pollInFlight) return;
+
+            pollInFlight = true;
 
             post(makeForm('bwh_debug_log_status'))
                 .then(function (data) {
@@ -293,14 +674,11 @@
 
                     var s = data.data;
                     updateDebugLogUI(s);
-
-                    var newFP = s.fingerprint || '';
-                    if (lastFingerprint && newFP && newFP !== lastFingerprint) {
-                        showPulsingDot();
-                    }
-                    lastFingerprint = newFP;
                 })
-                .catch(function () { /* silent — next poll will retry */ });
+                .catch(function () { /* silent — next poll will retry */ })
+                .then(function () {
+                    pollInFlight = false;
+                });
         }
 
         function startPolling() {
@@ -314,6 +692,7 @@
                 clearInterval(pollTimer);
                 pollTimer = null;
             }
+            pollInFlight = false;
         }
 
         /* ── 3d. Monitor toggle handler ── */
@@ -336,14 +715,19 @@
 
                         if (monitorActive) {
                             var ls = data.data.log_status || null;
-                            lastFingerprint = ls ? (ls.fingerprint || '') : '';
+                            latestFingerprint = ls ? (ls.fingerprint || '') : '';
+                            acknowledgedFingerprint = latestFingerprint;
+                            notifiedFingerprint = latestFingerprint;
                             updateDebugLogUI(ls);
                             startPolling();
                         } else {
                             stopPolling();
-                            hidePulsingDot();
-                            lastFingerprint = '';
+                            latestFingerprint = '';
+                            acknowledgedFingerprint = '';
+                            notifiedFingerprint = '';
+                            logHasContent = false;
                             updateDebugLogUI(null);
+                            clearStoredState();
                         }
                     })
                     .catch(function () { showMessage('Request failed.'); });
@@ -353,10 +737,32 @@
         /* ── 3e. Initial state on page load ── */
 
         if (monitorActive && bwh_ajax.debug_log_status) {
-            lastFingerprint = bwh_ajax.debug_log_status.fingerprint || '';
+            latestFingerprint = bwh_ajax.debug_log_status.fingerprint || '';
+
+            var persisted = readStoredState();
+            if (persisted && typeof persisted.updatedAt === 'number') {
+                var age = Date.now() - persisted.updatedAt;
+                if (age <= STATE_TTL_MS) {
+                    acknowledgedFingerprint = typeof persisted.acknowledgedFingerprint === 'string'
+                        ? persisted.acknowledgedFingerprint
+                        : latestFingerprint;
+                    notifiedFingerprint = typeof persisted.notifiedFingerprint === 'string'
+                        ? persisted.notifiedFingerprint
+                        : '';
+                } else {
+                    // Expired state: reset to current fingerprint and suppress indicators.
+                    acknowledgedFingerprint = latestFingerprint;
+                    notifiedFingerprint = latestFingerprint;
+                }
+            } else {
+                acknowledgedFingerprint = latestFingerprint;
+                notifiedFingerprint = latestFingerprint;
+            }
+
             updateDebugLogUI(bwh_ajax.debug_log_status);
             startPolling();
         } else {
+            clearStoredState();
             updateDebugLogUI(null);
         }
 
@@ -369,9 +775,18 @@
                 if (!monitorActive) return;
                 if (debugLogAnchor.style.cursor === 'default') return;
 
+                acknowledgeCurrentChange();
                 openLogViewer();
             });
         }
+
+        handleDebugChangedToastClick = function () {
+            if (!monitorActive || !logHasContent || !debugLogAnchor) return;
+            if (debugLogAnchor.style.cursor === 'default') return;
+
+            acknowledgeCurrentChange();
+            openLogViewer();
+        };
 
         function openLogViewer() {
             // Build or reuse modal
@@ -514,33 +929,101 @@
                     meta.textContent = '';
                 });
 
-            // Acknowledge changes — hide pulsing dot.
-            hidePulsingDot();
+            // Keep indicators synced to acknowledged state.
+            renderChangeIndicators();
         }
 
-        /* ── 3g. Delete debug log ── */
+        /* ── 3g. Delete debug log (with confirmation) ── */
 
         if (deleteLogAnchor) {
             deleteLogAnchor.addEventListener('click', function (e) {
                 e.preventDefault();
-                post(makeForm('bwh_delete_debug_log'))
+                showConfirmModal({
+                    message: 'Are you sure you want to delete the debug.log file? This action cannot be undone.',
+                    confirmText: 'Delete',
+                    onConfirm: function () {
+                        // Deletion intent acknowledges current change notification.
+                        acknowledgeCurrentChange();
+
+                        post(makeForm('bwh_delete_debug_log'))
+                            .then(function (data) {
+                                if (data && data.success && data.data) {
+                                    var r = data.data.result;
+                                    if (r === 'deleted') {
+                                        showMessage('Debug log deleted.');
+                                    } else if (r === 'not_found') {
+                                        showMessage('No debug log to delete.');
+                                    }
+                                    updateDebugLogUI(data.data.log_status || null);
+                                } else {
+                                    showMessage('Could not delete debug log.');
+                                    renderChangeIndicators();
+                                }
+                            })
+                            .catch(function () {
+                                showMessage('Request failed.');
+                                renderChangeIndicators();
+                            });
+                    }
+                });
+            });
+        }
+
+        /* ================================================================
+         * 4. Hover refresh (generic, with cooldown)
+         * ================================================================ */
+
+        var HOVER_COOLDOWN   = 20; // seconds
+        var lastHoverRefresh = 0;
+
+        /**
+         * Update the backup-size admin bar node.
+         * @param {Object|null} info - Result from BWH_Service::get_backup_dir_info().
+         */
+        function updateBackupSizeNode(info) {
+            if (!backupSizeNode) return;
+            if (info && info.exists && info.size > 0) {
+                if (backupSizeItem) {
+                    backupSizeItem.textContent = 'Backup data: ' + info.size_human;
+                }
+                backupSizeNode.style.display = '';
+            } else {
+                backupSizeNode.style.display = 'none';
+            }
+        }
+
+        /**
+         * Process hover refresh response. Extend this function to handle
+         * additional data keys in the future.
+         * @param {Object} data - Server response from bwh_hover_refresh.
+         */
+        function handleHoverData(data) {
+            if (!data) return;
+            if (data.backup_dir) {
+                updateBackupSizeNode(data.backup_dir);
+            }
+            // Future: handle more hover data keys here.
+        }
+
+        if (rootNode) {
+            rootNode.addEventListener('mouseenter', function () {
+                var now = Date.now() / 1000;
+                if (now - lastHoverRefresh < HOVER_COOLDOWN) return;
+                lastHoverRefresh = now;
+
+                post(makeForm('bwh_hover_refresh'))
                     .then(function (data) {
                         if (data && data.success && data.data) {
-                            var r = data.data.result;
-                            if (r === 'deleted') {
-                                showMessage('Debug log deleted.');
-                            } else if (r === 'not_found') {
-                                showMessage('No debug log to delete.');
-                            }
-                            lastFingerprint = '';
-                            hidePulsingDot();
-                            updateDebugLogUI(data.data.log_status || null);
-                        } else {
-                            showMessage('Could not delete debug log.');
+                            handleHoverData(data.data);
                         }
                     })
-                    .catch(function () { showMessage('Request failed.'); });
+                    .catch(function () { /* silent — non-critical */ });
             });
+        }
+
+        // Initial state from server-rendered hover data.
+        if (bwh_ajax.hover_data) {
+            handleHoverData(bwh_ajax.hover_data);
         }
     });
 
