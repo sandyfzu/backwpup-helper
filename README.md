@@ -18,6 +18,9 @@ local backup folders and toggle the Big backup flag without editing files by han
 - **Debug monitor** — watch the WordPress `debug.log` file in real time from the admin bar:
   - Toggle monitoring on/off (persisted in the database via the Options API).
   - Automatic polling detects new log entries and shows a pulsing amber dot on the top-level admin bar item with a tooltip.
+  - The debug log row shows `Debug log: nothing in logs` in a dimmed/deactivated visual state when the file is missing or empty.
+  - When changes are detected, the row displays a pulsing `changed` indicator next to the log size, and a clickable toast is shown (`click to view`).
+  - Change-indicator state is persisted in the browser (with a 1-hour validity window) so reloads keep consistent behavior.
   - Click to open a full log viewer modal (dark terminal theme, scrollable, selectable, with Copy and Scroll-to-bottom buttons). File content is read server-side via PHP, not fetched over HTTP.
   - Delete the debug log file directly from the admin bar.
   - Large files (> 512 KB) are safely truncated—only the last 512 KB is shown.
@@ -126,6 +129,8 @@ Success: Debug log deleted.
 - The debug monitor option is stored using the WordPress Options API (`bwh_debug_monitor`). It is cleaned up on plugin deletion via `uninstall.php`.
 - Debug log path resolution respects `WP_DEBUG_LOG` when set to a custom string in `wp-config.php`; otherwise defaults to `wp-content/debug.log`.
 - File fingerprinting uses `filemtime()` + `filesize()` (single OS stat call, zero file reads) for lightweight change detection during polling.
+- Backup directory size info is cached with WordPress transients for 20 seconds, and refreshed on hover with a 20-second client cooldown.
+- Client-side change-indicator acknowledgement is persisted with `localStorage` for up to 1 hour.
 
 ## References
 
@@ -134,5 +139,7 @@ Success: Debug log deleted.
 - Admin bar API: [https://developer.wordpress.org/reference/classes/wp_admin_bar/](https://developer.wordpress.org/reference/classes/wp_admin_bar/)
 - WP_Admin_Bar::add_group(): [https://developer.wordpress.org/reference/classes/wp_admin_bar/add_group/](https://developer.wordpress.org/reference/classes/wp_admin_bar/add_group/)
 - Options API: [https://developer.wordpress.org/plugins/settings/options-api/](https://developer.wordpress.org/plugins/settings/options-api/)
+- Transients API: [https://developer.wordpress.org/apis/transients/](https://developer.wordpress.org/apis/transients/)
 - WP_DEBUG_LOG: [https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/](https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/)
 - PHP fseek: [https://www.php.net/manual/en/function.fseek.php](https://www.php.net/manual/en/function.fseek.php)
+- Web Storage API (`localStorage`): [https://developer.mozilla.org/docs/Web/API/Window/localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage)
