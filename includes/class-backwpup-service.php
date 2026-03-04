@@ -188,22 +188,104 @@ class BWH_Service {
         $flag = self::get_flag_path();
         $dir  = dirname( $flag );
 
+        clearstatcache( true, $flag );
+
         if ( file_exists( $flag ) ) {
             if ( @unlink( $flag ) ) {
                 return 'active';
             }
+
+            // Retry with permissive chmod when possible (common in mixed user/group setups).
+            @chmod( $flag, 0664 );
+            @chmod( $dir, 0775 );
+            clearstatcache( true, $flag );
+            if ( @unlink( $flag ) ) {
+                return 'active';
+            }
+
+            // Fallback via WP_Filesystem (non-direct filesystem setups).
+            if ( function_exists( 'WP_Filesystem' ) ) {
+                if ( ! function_exists( 'request_filesystem_credentials' ) ) {
+                    require_once ABSPATH . 'wp-admin/includes/file.php';
+                }
+
+                global $wp_filesystem;
+                if ( empty( $wp_filesystem ) ) {
+                    WP_Filesystem();
+                }
+
+                if ( isset( $wp_filesystem ) && is_object( $wp_filesystem ) && method_exists( $wp_filesystem, 'delete' ) ) {
+                    $deleted = $wp_filesystem->delete( $flag, false, 'f' );
+                    if ( $deleted ) {
+                        return 'active';
+                    }
+                }
+            }
+
             return 'error';
         }
 
-        if ( ! is_dir( $dir ) ) {
-            wp_mkdir_p( $dir );
+        if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
+            return 'error';
+        }
+
+        if ( ! is_writable( $dir ) ) {
+            @chmod( $dir, 0775 );
         }
 
         if ( @touch( $flag ) ) {
+            @chmod( $flag, 0664 );
             return 'inactive';
         }
 
+        // Fallback when touch() is restricted but writes are allowed.
+        $written = @file_put_contents( $flag, '' );
+        if ( false !== $written ) {
+            @chmod( $flag, 0664 );
+            return 'inactive';
+        }
+
+        // Fallback via WP_Filesystem.
+        if ( function_exists( 'WP_Filesystem' ) ) {
+            if ( ! function_exists( 'request_filesystem_credentials' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+            }
+
+            global $wp_filesystem;
+            if ( empty( $wp_filesystem ) ) {
+                WP_Filesystem();
+            }
+
+            if ( isset( $wp_filesystem ) && is_object( $wp_filesystem ) && method_exists( $wp_filesystem, 'put_contents' ) ) {
+                $ok = $wp_filesystem->put_contents( $flag, '', false );
+                if ( $ok ) {
+                    return 'inactive';
+                }
+            }
+        }
+
         return 'error';
+    }
+
+    /**
+     * Return diagnostics useful for troubleshooting bigbackup toggle failures.
+     *
+     * @return array{flag: string, dir: string, dir_exists: bool, dir_writable: bool, file_exists: bool, file_writable: bool}
+     */
+    public static function get_bigbackup_diagnostics() {
+        $flag = self::get_flag_path();
+        $dir  = dirname( $flag );
+
+        clearstatcache( true, $flag );
+
+        return array(
+            'flag'          => $flag,
+            'dir'           => $dir,
+            'dir_exists'    => is_dir( $dir ),
+            'dir_writable'  => is_dir( $dir ) ? is_writable( $dir ) : false,
+            'file_exists'   => is_file( $flag ),
+            'file_writable' => is_file( $flag ) ? is_writable( $flag ) : false,
+        );
     }
 
     /* ---------------------------------------------------------------

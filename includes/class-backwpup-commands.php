@@ -67,7 +67,21 @@ class BWH_CLI_BigBackup {
     public function toggle( $args, $assoc_args ) {
         $new_state = BWH_Service::toggle_bigbackup();
         if ( $new_state === 'error' ) {
-            call_user_func( array( 'WP_CLI', 'error' ), 'Could not toggle big backup flag' );
+            $d = BWH_Service::get_bigbackup_diagnostics();
+            $message = sprintf(
+                'Could not toggle big backup flag. flag=%s; dir_exists=%s; dir_writable=%s; file_exists=%s; file_writable=%s',
+                $d['flag'],
+                $d['dir_exists'] ? 'yes' : 'no',
+                $d['dir_writable'] ? 'yes' : 'no',
+                $d['file_exists'] ? 'yes' : 'no',
+                $d['file_writable'] ? 'yes' : 'no'
+            );
+
+            if ( ! $d['dir_writable'] || ( $d['file_exists'] && ! $d['file_writable'] ) ) {
+                $message .= ' Hint: run WP-CLI as the same OS user/group as the web server process, or adjust ownership/permissions for wp-content/bigFiles/.donotbackup.';
+            }
+
+            call_user_func( array( 'WP_CLI', 'error' ), $message );
         } else {
             call_user_func( array( 'WP_CLI', 'success' ), sprintf( 'Big backup -> %s', $new_state ) );
         }
